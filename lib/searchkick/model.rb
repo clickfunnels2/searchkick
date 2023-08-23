@@ -1,3 +1,14 @@
+# this class from the seacrhkick gem is updated here with some changes. The changes
+# maily are due to ruby 3.0 changes in class varaibles.
+# The searchkick gem sets a class varaible searchkick_options for all models that has searchkick enabled.
+# The problem comes for models which are created via IdentityMirror.create_class.
+# Since ruby 3.0 does not allow class variables to be overtaken by another class
+# in the ancestral chain. So in this class wherever we have used class_variable_get(:@@var_name),
+# we have added a condition to check if this is an IdentityMirror model, then use the class varaible from
+# its superclass. If we do not do this, we get this error
+# class variable @@searchkick_options of ImageIdentityMirror is overtaken by Image.
+# At the time of forking this gem, the app was using v5.0.4 version of the gem.
+
 module Searchkick
   module Model
     def searchkick(**options)
@@ -68,8 +79,14 @@ module Searchkick
           def searchkick_index(name: nil)
             index_name = name || searchkick_klass.searchkick_index_name
             index_name = index_name.call if index_name.respond_to?(:call)
-            index_cache = class_variable_get(:@@searchkick_index_cache)
-            index_cache.fetch(index_name) { Searchkick::Index.new(index_name, searchkick_options) }
+
+            # We have added the if/else block to check if we need to pick the class varaible
+            # value from superclass or the class itself.
+            if self.name.include?('IdentityMirror')
+              index_cache = self.superclass.class_variable_get(:@@searchkick_index_cache)
+            else
+              index_cache = class_variable_get(:@@searchkick_index_cache)
+            end
           end
           alias_method :search_index, :searchkick_index unless method_defined?(:search_index)
 
@@ -84,7 +101,13 @@ module Searchkick
 
           def searchkick_index_name
             @searchkick_index_name ||= begin
-              options = class_variable_get(:@@searchkick_options)
+              # We have added the if/else block to check if we need to pick the class varaible
+              # value from superclass or the class itself.
+              if self.name.include?('IdentityMirror')
+                options = self.superclass.class_variable_get(:@@searchkick_options)
+              else
+                options = class_variable_get(:@@searchkick_options)
+              end
               if options[:index_name]
                 options[:index_name]
               elsif options[:index_prefix].respond_to?(:call)
