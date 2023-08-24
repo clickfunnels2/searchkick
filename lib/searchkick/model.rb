@@ -87,6 +87,7 @@ module Searchkick
             else
               index_cache = class_variable_get(:@@searchkick_index_cache)
             end
+            index_cache.fetch(index_name) { Searchkick::Index.new(index_name, searchkick_options) }
           end
           alias_method :search_index, :searchkick_index unless method_defined?(:search_index)
 
